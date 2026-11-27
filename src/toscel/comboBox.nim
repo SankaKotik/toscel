@@ -210,10 +210,24 @@ method init*(this: ComboBox) =
 
 
 
+proc parentHiddenOrCollapsed(this: Uiobj): Uiobj =
+  var p = this
+  while p != nil:
+    if p.visibility[] in {hidden, collapsed}:
+      return p
+    p = p.parent
+
+
 method recieve*(this: ComboBox, signal: Signal) =
+  # reset the open dropdown when the combobox or a parent becomes invisible,
+  # otherwise a dropdown left open under a closed window/modal
+  # would consume all scrolls
+  if signal of VisibilityChanged and signal.VisibilityChanged.visibility in {hidden, collapsed}:
+    this.dropdownOpened[] = false
+
   if signal of WindowEvent and signal.WindowEvent.event of ScrollEvent:
     let e = (ref ScrollEvent)(signal.WindowEvent.event)
-    if not signal.WindowEvent.handled and not this.dropdownOpened[]:
+    if not signal.WindowEvent.handled and not this.dropdownOpened[] and this.parentHiddenOrCollapsed == nil:
       let pos = this.root.mouseState.pos - this.globalXy
       if pos.x in 0'f32..this.w[] and pos.y in 0'f32..this.h[]:
         if this.options[].len != 0:
